@@ -9,6 +9,9 @@ const sha = require('object-sha');
 const request = require('request');
 const ___dirname = path.resolve();
 var crypto = require('crypto');
+const paillierBigint = require('paillier-bigint');
+const sss = require('shamirs-secret-sharing')
+
 
 
 global.puKey;
@@ -16,12 +19,27 @@ global.prKey;
 global.Key;
 global.mensaje;
 
+//paillier
+global.paillierPuKey;
+global.paillierPrKey;
+
+//shamir
+
+global.SKey = null;
+global.c;
+global.sharesServer;
+
+
 async function claves() {
   const { publicKey, privateKey } = await rsa.generateRandomKeys(3072);
+  const paillierKeyPair = await paillierBigint.generateRandomKeysSync(3072);
+
 
   puKey = publicKey;
   prKey = privateKey;
-
+  paillierPuKey = paillierKeyPair.publicKey;
+  paillierPrKey = paillierKeyPair.privateKey;
+  console.log("clave publica paillier    :"   + paillierPuKey)
 };
 
 
@@ -45,6 +63,67 @@ app.listen(app.get('port'), () => {
     console.log(`Server on port ${app.get('port')}`);
   });
 // routes
+app.get("/shamir", (req, res) => {
+
+  const secret = Buffer.from('Soy pobre')
+  const shares = sss.split(secret, { shares: 3, threshold: 2 })
+  sharesServer = shares;
+  console.log(sharesServer)
+  const cosas = {
+    respuestaServidor: shares
+  }
+  res.status(200).send(cosas);
+});
+
+
+app.post("/getShamirKey", (req, res) => {
+  console.log(req.body)
+  console.log(req.body.array2.s1);
+  
+    console.log("estoy en el 3")
+
+  
+
+
+    const secret = sss.combine([sharesServer[Number(req.body.array2.s1)], sharesServer[Number(req.body.array2.s2)], sharesServer[Number(req.body.array2.s3)]]);
+
+    const cosas = {
+      respuestaServidor: secret
+    }
+    res.status(200).send(cosas);
+
+});
+
+app.get('/keyPaillier', (req, res) => {
+
+  class PublicKey {
+    constructor(n, g) {
+      this.n = bigconv.bigintToHex(n);
+      this.g = bigconv.bigintToHex(g);
+    }
+  }
+
+  publicKey = new PublicKey(
+    paillierPuKey.n,
+    paillierPuKey.g
+  )
+
+  res.status(200).send(publicKey);
+
+});
+
+
+
+app.post("/suma", (req, res) => {
+
+  console.log("la suma es : "+bigconv.bigintToHex(paillierPrKey.decrypt(paillierPuKey.addition(bigconv.hexToBigint(req.body.c1),bigconv.hexToBigint(req.body.c2)))))
+  sumaCifrada = bigconv.bigintToHex(paillierPrKey.decrypt(paillierPuKey.addition(bigconv.hexToBigint(req.body.c1),bigconv.hexToBigint(req.body.c2))));
+
+  const cosas = {
+    suma: sumaCifrada
+  }
+  res.status(200).send(cosas);
+});
 
 
 
@@ -165,3 +244,7 @@ function decrypt(password,iv){
   console.log(dec);
   return dec;
 }
+
+ key = {
+  toString: function () { return "Blah" }
+};
